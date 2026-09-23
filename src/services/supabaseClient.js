@@ -1,18 +1,44 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Supabase Configuration for Time Moves Slow
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL || "https://beweahoqznbeuklgbrxp.supabase.co";
-const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+// Supabase Configuration with safe fallbacks for Vercel
+const DEFAULT_URL = "https://beweahoqznbeuklgbrxp.supabase.co";
+const DEFAULT_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJld2VhaG9xem5iZXVrbGdicnhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4OTQyMTYsImV4cCI6MjEwMjQ3MDIxNn0.EUt-ScjldUa3TljuCbKWsjSSiILLqYeOKnxUWFJfIOo";
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEFAULT_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_ANON_KEY;
+
+function initSupabase() {
+  try {
+    return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    });
+  } catch (err) {
+    console.warn("Failed to initialize Supabase client:", err);
+    // Return dummy client to prevent app crashing
+    return {
+      auth: {
+        getUser: async () => ({ data: { user: null }, error: null }),
+        signUp: async () => ({ data: null, error: new Error("Supabase key missing") }),
+        signInWithPassword: async () => ({ data: null, error: new Error("Supabase key missing") }),
+        signOut: async () => ({ error: null }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
+      },
+      from: () => ({
+        select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        insert: () => Promise.resolve({ data: null, error: null }),
+        update: () => ({ eq: () => Promise.resolve({ data: null, error: null }) }),
+        delete: () => ({ eq: () => Promise.resolve({ data: null, error: null }) })
+      })
+    };
   }
-});
+}
+
+export const supabase = initSupabase();
 
 /**
  * Sign up a new user with email, password, and full name
