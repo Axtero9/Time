@@ -343,7 +343,7 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)}
         onAuthSuccess={(user) => {
           setCurrentUser(user);
-          loadBoxes(user);
+          setIsAuthModalOpen(false);
         }}
       />
 

@@ -25,7 +25,28 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
         if (password.length < 6) {
           throw new Error("Password must be at least 6 characters.");
         }
+        
         const data = await signUpUser(email.trim(), password, fullName.trim());
+
+        // When a user already exists, Supabase returns user object with identities: []
+        const isRepeatedSignup =
+          data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0;
+
+        if (isRepeatedSignup) {
+          // Attempt seamless sign-in with the provided password
+          try {
+            const signInData = await signInUser(email.trim(), password);
+            if (signInData?.user) {
+              onAuthSuccess(signInData.user);
+              onClose();
+              return;
+            }
+          } catch {
+            setMode("signin");
+            throw new Error("An account with this email already exists. Please sign in with your password.");
+          }
+        }
+
         if (data?.user) {
           onAuthSuccess(data.user);
           onClose();
@@ -42,7 +63,14 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
       }
     } catch (err) {
       console.error("Auth error:", err);
-      setErrorMsg(err.message || "Authentication failed. Please check your credentials.");
+      let msg = err.message || "Authentication failed. Please check your credentials.";
+      if (msg.includes("Invalid login credentials")) {
+        msg = "Incorrect email or password. Please verify and try again.";
+      } else if (msg.includes("User already registered")) {
+        setMode("signin");
+        msg = "An account with this email already exists. Please sign in with your password.";
+      }
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }
